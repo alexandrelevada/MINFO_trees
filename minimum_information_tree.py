@@ -15,7 +15,7 @@ and constructing information-theoretic based k-NN graphs, MINFO trees generate d
 local cohesion and global separation among clusters. Our method provides interpretable and faithful representations of
 clustering results, enabling qualitative evaluation of cluster quality and relationships. Experimental results on 
 real-world datasets highlight the differences between MINFO trees over traditional dimensionality reduction methods 
-such as t-SNE and UMAP in terms of preserving cluster topology and enhancing visual interpretability.
+such as t-SNE, UMAP and PaCMAP in terms of preserving cluster topology and enhancing visual interpretability.
 
 """
 import warnings
