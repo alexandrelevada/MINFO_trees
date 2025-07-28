@@ -14,7 +14,7 @@ high-dimensional data with an emphasis on preserving clustering structure. By le
 and constructing information-theoretic based k-NN graphs, MINFO trees generate data visualizations that reflect both 
 local cohesion and global separation among clusters. Our method provides interpretable and faithful representations of
 clustering results, enabling qualitative evaluation of cluster quality and relationships. Experimental results on 
-real-world datasets highlight the differences between MINFO trees over traditional dimensionality reduction methods 
+real-world datasets highlight the differences between MINFO trees over state-of-the-art dimensionality reduction methods 
 such as t-SNE, UMAP and PaCMAP in terms of preserving cluster topology and enhancing visual interpretability.
 
 """
