@@ -19,7 +19,8 @@ such as t-SNE and UMAP in terms of preserving cluster topology and enhancing vis
 
 """
 import warnings
-import umap
+import umap 				# pip install umap-learn
+import pacmap				# pip install pacmap
 import matplotlib as mpl
 import numpy as np
 import scipy as sp
@@ -271,8 +272,8 @@ def compute_metrics(A, labels):
 ##############################################
 #X = skdata.load_iris()
 #X = skdata.fetch_openml(name='led24', version=1)
-#X = skdata.load_digits()
-X = skdata.fetch_openml(name='vowel', version=1)
+X = skdata.load_digits()
+#X = skdata.fetch_openml(name='vowel', version=1)
 #X = skdata.fetch_openml(name='texture', version=1)
 #X = skdata.fetch_openml(name='mfeat-fourier', version=1)
 #X = skdata.fetch_openml(name='mfeat-pixel', version=1)
@@ -301,11 +302,12 @@ X = skdata.fetch_openml(name='vowel', version=1)
 #X = skdata.fetch_openml(name='primary-tumor', version=1)
 #X = skdata.fetch_openml(name='soybean', version=1)
 #X = skdata.fetch_openml(name='cardiotocography', version=1)
+#X = skdata.fetch_openml(name='user-knowledge', version=1)
 
 dados = X['data']
 target = X['target']
 
-# Convert labels to integers
+# Convert labels to integers for the q-state Potts model
 S = list(set(target))
 target = np.array(target)
 for i in range(len(target)):
@@ -336,7 +338,6 @@ if not isinstance(dados, np.ndarray):
     dados[cat_cols] = dados[cat_cols].apply(lambda x: x.cat.codes)
     # Convert to numpy (openml uses dataframe)
     dados = dados.to_numpy()
-    #target = target.to_numpy()
 
 n = dados.shape[0]
 m = dados.shape[1]
@@ -358,7 +359,9 @@ dados = np.nan_to_num(dados)
 # Data standardization (to deal with variables having different units/scales)
 dados = preprocessing.scale(dados)
 
-# Clustering algorithms
+########################################
+# Clustering algorithm
+########################################
 clustering = AgglomerativeClustering(n_clusters=c, linkage='ward').fit(dados)
 target = clustering.labels_
 target = target.astype('int32')
@@ -372,6 +375,9 @@ print('Fowlkes-Mallows score: ', fm)
 print('V-measure score: ', vm)
 print()
 
+#######################################
+# Raw data MST
+#######################################
 # Build the adjacency matrix of the graph
 A = build_KNN_Graph(dados, nn)
 G = nx.from_numpy_array(A)
@@ -380,8 +386,18 @@ T = nx.minimum_spanning_tree(G)
 # Adjacency matrix
 R = nx.to_numpy_array(T)
 # Plot minimum spanning tree
-plot_KNN_graph(R, target, layout='kawai')
+###plot_KNN_graph(R, target, layout='kawai')
 
+# Compute metrics in the regular MST
+MST_modula, MST_coverage, MST_performance, MST_cc = compute_metrics(T, target)
+centrality = nx.information_centrality(T)
+print('Modularity (MST): ', MST_modula)
+print('Information Centrality (MST): ', sum(list(centrality.values())))
+print()
+
+##############################################
+# MPL estimation of the inverse temperature
+##############################################
 # Estimates the maximum pseudo-likelihood estimator of the inverse temperature
 sol = optimize.root_scalar(pseudo_likelihood, method='secant', x0=0, x1=1)
 if not sol.converged:
@@ -390,13 +406,16 @@ print('MPL estimator: ', sol)
 print()
 # Maximum pseudo-likelihood estimator
 beta_mpl = sol.root
+
+#######################################
+# Minimum Information Tree - MIT
+#######################################
 # Compute the first and second order local Fisher information 
 PHI, PSI = FisherInformation(A, beta_mpl)
 # Approximate the local curvatures
 curvaturas = -PSI/(PHI+0.001)
 # Normalize curvatures
 K = normalize_curvatures(curvaturas)
-
 # Information graph
 alpha = (np.sqrt(5) - 1)/2
 IG = InformationGraph(A, K, alpha=alpha)
@@ -404,34 +423,24 @@ IG = InformationGraph(A, K, alpha=alpha)
 MinT = MinimumInformationTree(IG)
 # Plot minimum information tree
 plot_KNN_graph(MinT, target, layout='kawai')
-
-# Compute metrics in the regular MST
-MST_modula, MST_coverage, MST_performance, MST_cc = compute_metrics(T, target)
-centrality = nx.information_centrality(T)
-print('Modularity (MST): ', MST_modula)
-print('Coverage (MST): ', MST_coverage)
-print('Performance (MST): ', MST_performance)
-print('Centrality (MST): ', sum(list(centrality.values())))
-print()
-
 # Compute metrics in the regular MST
 MIT = nx.from_numpy_array(MinT)
 MIT_modula, MIT_coverage, MIT_performance, MIT_cc = compute_metrics(MIT, target)
 centrality = nx.information_centrality(MIT)
 print('Modularity (MIT): ', MIT_modula)
-print('Coverage (MIT): ', MIT_coverage)
-print('Performance (MIT): ', MIT_performance)
 print('Centrality (MIT): ', sum(list(centrality.values())))
 print()
 
-# Performance of clustering after UMAP
+#######################################
+# t-SNE data MST 
+#######################################
+# Performance of clustering after t-SNE
 model = TSNE(n_components=2, random_state=42)
 tsne_data = model.fit_transform(dados)
 # Clustering in low dimensional data
 clustering = AgglomerativeClustering(n_clusters=c, linkage='ward').fit(tsne_data)
 target = clustering.labels_
 target = target.astype('int32')
-
 # Build the adjacency matrix of the graph
 A = build_Complete_Graph(tsne_data)
 G = nx.from_numpy_array(A)
@@ -439,16 +448,18 @@ G = nx.from_numpy_array(A)
 T = nx.minimum_spanning_tree(G)
 # Adjacency matrix
 R = nx.to_numpy_array(T)
-
+# Plot minimum spanning tree
+###plot_KNN_graph(R, target, layout='kawai')
 # Compute metrics in the regular UMAP data MST
 TMST_modula, TMST_coverage, TMST_performance, TMST_cc = compute_metrics(T, target)
 centrality = nx.information_centrality(T)
 print('Modularity (t-SNE MST): ', TMST_modula)
-print('Coverage (t-SNE MST): ', TMST_coverage)
-print('Performance (t-SNE MST): ', TMST_performance)
 print('Centrality (t-SNE MST): ', sum(list(centrality.values())))
 print()
 
+#######################################
+# UMAP data MST 
+#######################################
 # Performance of clustering after UMAP
 model = umap.UMAP(n_components=2, random_state=42)
 umap_data = model.fit_transform(dados)
@@ -456,7 +467,6 @@ umap_data = model.fit_transform(dados)
 clustering = AgglomerativeClustering(n_clusters=c, linkage='ward').fit(umap_data)
 target = clustering.labels_
 target = target.astype('int32')
-
 # Build the adjacency matrix of the graph
 A = build_Complete_Graph(umap_data)
 G = nx.from_numpy_array(A)
@@ -465,13 +475,36 @@ T = nx.minimum_spanning_tree(G)
 # Adjacency matrix
 R = nx.to_numpy_array(T)
 # Plot minimum spanning tree
-plot_KNN_graph(R, target, layout='kawai')
-
+###plot_KNN_graph(R, target, layout='kawai')
 # Compute metrics in the regular UMAP data MST
 UMST_modula, UMST_coverage, UMST_performance, UMST_cc = compute_metrics(T, target)
 centrality = nx.information_centrality(T)
 print('Modularity (UMAP MST): ', UMST_modula)
-print('Coverage (UMAP MST): ', UMST_coverage)
-print('Performance (UMAP MST): ', UMST_performance)
 print('Centrality (UMAP MST): ', sum(list(centrality.values())))
+print()
+
+#######################################
+# PaCMAP data MST 
+#######################################
+# Performance of clustering after PaCMAP
+model = pacmap.PaCMAP(n_components=2, random_state=42)
+pacmap_data = model.fit_transform(dados)
+# Clustering in low dimensional data
+clustering = AgglomerativeClustering(n_clusters=c, linkage='ward').fit(pacmap_data)
+target = clustering.labels_
+target = target.astype('int32')
+# Build the adjacency matrix of the graph
+A = build_Complete_Graph(pacmap_data)
+G = nx.from_numpy_array(A)
+# Regular MST
+T = nx.minimum_spanning_tree(G)
+# Adjacency matrix
+R = nx.to_numpy_array(T)
+# Plot minimum spanning tree
+###plot_KNN_graph(R, target, layout='kawai')
+# Compute metrics in the regular UMAP data MST
+PacMST_modula, PacMST_coverage, PacMST_performance, PacMST_cc = compute_metrics(T, target)
+centrality = nx.information_centrality(T)
+print('Modularity (PaCMAP MST): ', PacMST_modula)
+print('Centrality (PaCMAP MST): ', sum(list(centrality.values())))
 print()
