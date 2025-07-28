@@ -412,7 +412,7 @@ beta_mpl = sol.root
 #######################################
 # Compute the first and second order local Fisher information 
 PHI, PSI = FisherInformation(A, beta_mpl)
-# Approximate the local curvatures
+# Approximate the local curvatures (add small value to avoid division by zero)
 curvaturas = -PSI/(PHI+0.001)
 # Normalize curvatures
 K = normalize_curvatures(curvaturas)
